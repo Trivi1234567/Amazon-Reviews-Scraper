@@ -1,5 +1,3 @@
-# ── Minimal, guaranteed-to-work dependency list ───────────
 pandas
-requests               # <- hard requirement for HTTP calls
-beautifulsoup4         # <- HTML parsing inside the scraper
-amazon-product-review-scraper==0.9
+selenium==4.22.0          # July-2025 current
+webdriver-manager==4.0.1  # auto-downloads the matching ChromeDriver
