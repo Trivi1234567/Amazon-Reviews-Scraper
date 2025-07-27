@@ -1,32 +1,44 @@
-name: Weekly Amazon Reviews
+name: Weekly Amazon Reviews     # appears under “Actions” tab
+
 on:
-  schedule:
-    - cron: "0 4 * * 1"          # 04:00 UTC every Monday
-  workflow_dispatch:             # manual “Run workflow” button
+  schedule:                     # 04:00 UTC every Monday  (cron is always UTC) :contentReference[oaicite:0]{index=0}
+    - cron: "0 4 * * 1"
+  workflow_dispatch:            # adds a handy “Run workflow” button
 
 jobs:
   scrape:
-    runs-on: ubuntu-latest       # free & unlimited for public repos :contentReference[oaicite:1]{index=1}
-    timeout-minutes: 15
+    runs-on: ubuntu-latest      # public repos get unlimited minutes on this runner :contentReference[oaicite:1]{index=1}
+    timeout-minutes: 15         # fail fast if something hangs
 
     steps:
-      - uses: actions/checkout@v4
+      # ─── 1.  Check out your code ──────────────────────────────────────────
+      - uses: actions/checkout@v4   # official checkout action :contentReference[oaicite:2]{index=2}
 
+      # ─── 2.  Install Python 3.11 (pre-cached on GH runners) ───────────────
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.11"    # any actively-supported version works
 
-      - name: Install deps
+      # ─── 3.  Install project dependencies ────────────────────────────────
+      - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          python - <<'PY'
+import amazon_product_review_scraper, sys
+print("✅  Using amazon-product-review-scraper", amazon_product_review_scraper.__version__)
+PY
+        # `pip install` honours the exact versions you listed in requirements.txt;
+        # we echo the scraper version just for quick verification.
 
+      # ─── 4.  Run the scraper wrapper script ───────────────────────────────
       - name: Run scraper
         run: python scrape_reviews.py
 
+      # ─── 5.  Upload the two CSVs as a single artifact ─────────────────────
       - name: Upload CSVs
         uses: actions/upload-artifact@v4
         with:
           name: amazon-review-data
           path: outputs/*.csv
-          retention-days: 90     # stays within free 500 MB cap :contentReference[oaicite:2]{index=2}
+          retention-days: 90   # default; artefacts auto-purge after 90 d :contentReference[oaicite:3]{index=3}
