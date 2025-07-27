@@ -2,29 +2,26 @@ name: Weekly Amazon Reviews
 
 on:
   schedule:
-    - cron: "0 4 * * 1"    # 04:00 UTC every Monday
-  workflow_dispatch:        # gives you a 'Run workflow' button
+    - cron: "0 4 * * 1"     # 04:00 UTC every Monday
+  workflow_dispatch:        # adds a 'Run workflow' button
 
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # free 4-CPU runner for public repos
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4        # pulls your repo into $GITHUB_WORKSPACE
 
       - name: Set up Python
-        uses: actions/setup-python@v4          # installs 3.11 by default
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.11"               # pick any supported version
-        # :contentReference[oaicite:5]{index=5}
+          python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          python -m playwright install --with-deps
-        # Playwright CI install command from official docs :contentReference[oaicite:6]{index=6}
 
       - name: Run scraper
         run: python scrape_reviews.py
@@ -34,5 +31,4 @@ jobs:
         with:
           name: amazon-review-data
           path: outputs/*.csv
-          retention-days: 90
-        # upload-artifact action reference :contentReference[oaicite:7]{index=7}
+          retention-days: 90   # default; keep within free quota
