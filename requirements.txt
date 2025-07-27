@@ -1,3 +1,4 @@
 pandas
-selenium==4.22.0          # July-2025 current
-webdriver-manager==4.0.1  # auto-downloads the matching ChromeDriver
+selenium==4.22.0            # July 2025 current
+webdriver-manager==4.0.1
+git+https://github.com/oxylabs/amazon-review-scraper.git
