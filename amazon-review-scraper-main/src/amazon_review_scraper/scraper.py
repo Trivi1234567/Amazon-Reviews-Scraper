@@ -3,18 +3,16 @@
 """
 
 import logging
+import os            #  ← NEW: lets us read AMAZON_DOMAIN
 import time
-
 from typing import List
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webelement import WebElement
 from webdriver_manager.chrome import ChromeDriverManager
 
-from amazon_review_scraper.conf import amazon_review_scraper_settings
 from amazon_review_scraper.models import Review
 
 
@@ -47,15 +45,17 @@ class AmazonReviewScraper:
         """Parses review data from the given review element"""
         author = review.find_element(By.CLASS_NAME, "a-profile-name").text
         content = review.find_element(By.CLASS_NAME, "reviewText").text
-        rating_element = review.find_element(
-            By.CLASS_NAME, "review-rating"
-        ).find_element(By.CLASS_NAME, "a-icon-alt")
+        rating_element = (
+            review.find_element(By.CLASS_NAME, "review-rating")
+            .find_element(By.CLASS_NAME, "a-icon-alt")
+        )
         rating_text = rating_element.get_attribute("innerHTML")
         rating = float(rating_text.split(" out of ")[0])
 
-        title_element = review.find_element(
-            By.CLASS_NAME, "review-title-content"
-        ).find_element(By.TAG_NAME, "span")
+        title_element = (
+            review.find_element(By.CLASS_NAME, "review-title-content")
+            .find_element(By.TAG_NAME, "span")
+        )
         title = title_element.text
 
         return Review(
@@ -78,7 +78,7 @@ class AmazonReviewScraper:
                 parsed_review = self._parse_review_data(review)
             except Exception:
                 self._logger.exception(
-                    "Uexpected error when parsing data for product. Skipping.."
+                    "Unexpected error when parsing data for product. Skipping.."
                 )
                 continue
             else:
@@ -103,7 +103,11 @@ class AmazonReviewScraper:
         except Exception as e:
             raise DriverInitializationError from e
 
-        url = amazon_review_scraper_settings.get_amazon_product_url(asin_code)
+        # --- NEW: build URL for any Amazon TLD --------------------------------
+        domain = os.getenv("AMAZON_DOMAIN", "amazon.com")
+        url = f"https://www.{domain}/product-reviews/{asin_code}"
+        # ----------------------------------------------------------------------
+
         try:
             return self._get_reviews_from_product_page(url, driver)
         except Exception as e:
