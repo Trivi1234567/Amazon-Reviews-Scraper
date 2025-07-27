@@ -1,3 +1,2 @@
 pandas
-selenium==4.21.0
-webdriver-manager==4.0.1
+amazon-product-review-scraper==0.9
