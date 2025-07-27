@@ -1,18 +1,18 @@
 name: Weekly Amazon Reviews
 
 on:
-  schedule:
-    - cron: "0 4 * * 1"          # 04:00 UTC every Monday
-  workflow_dispatch:             # gives you the ★ Run workflow button
+  schedule:                   # run every Monday 04:00 UTC
+    - cron: "0 4 * * 1"
+  workflow_dispatch:          # manual “Run workflow” button
 
 jobs:
   scrape:
-    runs-on: ubuntu-latest       # free & unlimited on public repos :contentReference[oaicite:6]{index=6}
+    runs-on: ubuntu-latest    # unlimited minutes for public repos 
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4            # pulls the repo
-                                            # headless Chrome already pre-installed
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -30,4 +30,4 @@ jobs:
         with:
           name: amazon-review-data
           path: outputs/*.csv
-          retention-days: 90
+          retention-days: 90    # free 500 MB quota lasts years at 2 small CSVs/week
