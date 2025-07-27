@@ -1,57 +1,41 @@
 """
-Weekly Amazon-review puller for two ASINs (US + CA)
-
-▸ Pure requests/BS4 – no Selenium, proxies, or paid APIs
-▸ Runs entirely in free GitHub-Actions minutes
+Pull Amazon reviews for the ASINs below via Oxylabs' Selenium scraper.
+Runs headless on GitHub Actions without Poetry or proxies.
 """
 
 from datetime import date
 from pathlib import Path
-import time
-import random
-import pandas as pd
-import amazon_product_review_scraper as aprs
+import os, random, shutil
+import amazon_review_scraper.scraper as ox       # Oxylabs class
+from amazon_review_scraper.scraper import AmazonReviewScraper
 
-# ── 1  Patch the proxy routine so it skips scraping free-proxy-list ─────────
-def _noop_proxy_generator(self):
-    """Return an empty proxy list; we don't need proxies for tiny volume."""
-    return []
-
-aprs.proxy_generator = _noop_proxy_generator
-# ────────────────────────────────────────────────────────────────────────────
+# ── 1 ▸ Patch the proxy routine and the empty-list random.choice call ──────
+def _dummy_proxy_generator(self):
+    return [None]              # non-empty list avoids IndexError
+ox.AmazonReviewScraper.proxy_generator = _dummy_proxy_generator
+_original_choice = random.choice
+random.choice = lambda seq: seq[0]               # first (and only) element
+# ───────────────────────────────────────────────────────────────────────────
 
 PRODUCTS = [
-    {"asin": "B0DZZWMB2L", "site": "amazon.com"},
-    {"asin": "B071F2VLQT", "site": "amazon.ca"},
+    {"asin": "B0DZZWMB2L", "domain": "amazon.com"},
+    {"asin": "B071F2VLQT", "domain": "amazon.ca"},
 ]
 
-OUT = Path("outputs")
-OUT.mkdir(exist_ok=True)
-stamp = date.today().isoformat()
+OUT = Path("outputs"); OUT.mkdir(exist_ok=True)
+today = date.today().isoformat()
 
-for p in PRODUCTS:
-    # ── 2  Temporarily monkey-patch random.choice so empty list → None ——––
-    _orig_choice = random.choice
+def run(asin: str, domain: str):
+    os.environ["AMAZON_DOMAIN"] = domain         # scraper now honours this
+    scraper = AmazonReviewScraper()
+    df = scraper.scrape_amazon_reviews(asin)
+    tmp = Path("amazon_reviews.csv")             # Oxylabs always writes here
+    out_file = OUT / f"{domain.replace('.', '_')}_{asin}_{today}.csv"
+    shutil.move(tmp, out_file)
+    print(f"✓  {out_file.name}  ({len(df)} rows)")
 
-    def _safe_choice(seq):
-        return None if len(seq) == 0 else _orig_choice(seq)
+for item in PRODUCTS:
+    run(item["asin"], item["domain"])
 
-    random.choice = _safe_choice
-    # ----------------------------------------------------------------------
-
-    try:
-        scraper = aprs.amazon_product_review_scraper(
-            amazon_site=p["site"],
-            product_asin=p["asin"],
-            sleep_time=2,       # respectful delay between pages
-            start_page=1,
-            end_page=None       # keep paging until reviews stop
-        )
-    finally:
-        random.choice = _orig_choice   # ALWAYS restore
-
-    df: pd.DataFrame = scraper.scrape()
-    outfile = OUT / f'{p["site"].replace(".", "_")}_{p["asin"]}_{stamp}.csv'
-    df.to_csv(outfile, index=False)
-    print(f"✓  Saved {len(df):>3} reviews → {outfile}")
-    time.sleep(1)   # tiny pause between products
+# restore random.choice (defensive)
+random.choice = _original_choice
