@@ -1,0 +1,38 @@
+name: Weekly Amazon Reviews
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"    # 04:00 UTC every Monday
+  workflow_dispatch:        # gives you a 'Run workflow' button
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4          # installs 3.11 by default
+        with:
+          python-version: "3.11"               # pick any supported version
+        # :contentReference[oaicite:5]{index=5}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps
+        # Playwright CI install command from official docs :contentReference[oaicite:6]{index=6}
+
+      - name: Run scraper
+        run: python scrape_reviews.py
+
+      - name: Upload CSVs
+        uses: actions/upload-artifact@v4
+        with:
+          name: amazon-review-data
+          path: outputs/*.csv
+          retention-days: 90
+        # upload-artifact action reference :contentReference[oaicite:7]{index=7}
