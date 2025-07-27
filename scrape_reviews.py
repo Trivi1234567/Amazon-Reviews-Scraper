@@ -1,21 +1,24 @@
 """
-Pull Amazon reviews for the ASINs below via Oxylabs' Selenium scraper.
-Runs headless on GitHub Actions without Poetry or proxies.
+Pulls the latest Amazon reviews for two ASINs every run.
+✓ Uses Oxylabs’ Selenium scraper
+✓ No proxies, Poetry or Makefile headaches
+✓ Works head-less on GitHub Actions free runners
 """
 
 from datetime import date
 from pathlib import Path
-import os, random, shutil
-import amazon_review_scraper.scraper as ox       # Oxylabs class
-from amazon_review_scraper.scraper import AmazonReviewScraper
+import os, shutil, random
+from selenium.webdriver.chrome.options import Options
+import amazon_review_scraper.scraper as ox  # library lives in the repo we pip-installed
 
-# ── 1 ▸ Patch the proxy routine and the empty-list random.choice call ──────
-def _dummy_proxy_generator(self):
-    return [None]              # non-empty list avoids IndexError
+# ─── Patch the proxy routine & random.choice that expect a non-empty list ───
+def _dummy_proxy_generator(self):           # returns one fake entry
+    return [None]
+
 ox.AmazonReviewScraper.proxy_generator = _dummy_proxy_generator
-_original_choice = random.choice
-random.choice = lambda seq: seq[0]               # first (and only) element
-# ───────────────────────────────────────────────────────────────────────────
+_random_choice_orig = random.choice
+random.choice = lambda seq: seq[0]          # pick first element even if it's None
+# ────────────────────────────────────────────────────────────────────────────
 
 PRODUCTS = [
     {"asin": "B0DZZWMB2L", "domain": "amazon.com"},
@@ -25,17 +28,20 @@ PRODUCTS = [
 OUT = Path("outputs"); OUT.mkdir(exist_ok=True)
 today = date.today().isoformat()
 
-def run(asin: str, domain: str):
-    os.environ["AMAZON_DOMAIN"] = domain         # scraper now honours this
-    scraper = AmazonReviewScraper()
-    df = scraper.scrape_amazon_reviews(asin)
-    tmp = Path("amazon_reviews.csv")             # Oxylabs always writes here
-    out_file = OUT / f"{domain.replace('.', '_')}_{asin}_{today}.csv"
-    shutil.move(tmp, out_file)
-    print(f"✓  {out_file.name}  ({len(df)} rows)")
+def run_one(asin: str, domain: str):
+    os.environ["AMAZON_DOMAIN"] = domain            # Oxylabs URL builder reads this
+    # Force Chrome flags that work in CI
+    Options().add_argument("--no-sandbox")
+    Options().add_argument("--disable-dev-shm-usage")
+    scraper = ox.AmazonReviewScraper()
+    df = scraper.scrape_amazon_reviews(asin)        # returns pandas DF
+    src = Path("amazon_reviews.csv")                # library always names file like this
+    dst = OUT / f"{domain.replace('.', '_')}_{asin}_{today}.csv"
+    shutil.move(src, dst)
+    print(f"✓  {dst.name}  ({len(df)} rows)")
 
-for item in PRODUCTS:
-    run(item["asin"], item["domain"])
+for prod in PRODUCTS:
+    run_one(prod["asin"], prod["domain"])
 
-# restore random.choice (defensive)
-random.choice = _original_choice
+# restore random.choice just in case
+random.choice = _random_choice_orig
