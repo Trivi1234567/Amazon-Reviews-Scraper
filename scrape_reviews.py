@@ -1,23 +1,23 @@
 """
-Pulls the latest Amazon reviews for two ASINs every run.
-✓ Uses Oxylabs’ Selenium scraper
-✓ No proxies, Poetry or Makefile headaches
-✓ Works head-less on GitHub Actions free runners
+Scrape reviews for two ASINs with Oxylabs' Selenium scraper.
+Uses Selenium-Manager (no webdriver-manager) + CI-friendly Chrome flags.
 """
 
 from datetime import date
 from pathlib import Path
-import os, shutil, random
+import os, random, shutil, time
+import selenium.webdriver as sel
 from selenium.webdriver.chrome.options import Options
-import amazon_review_scraper.scraper as ox  # library lives in the repo we pip-installed
+from amazon_review_scraper.scraper import AmazonReviewScraper
 
-# ─── Patch the proxy routine & random.choice that expect a non-empty list ───
-def _dummy_proxy_generator(self):           # returns one fake entry
-    return [None]
+# ── 1 ▸ monkey-patch the obsolete proxy routine *inside* the class ──────────
+def _dummy_proxy_generator(self):           # avoid free-proxy scrape
+    return [None]                           # non-empty to keep .choice() happy
+AmazonReviewScraper.proxy_generator = _dummy_proxy_generator
 
-ox.AmazonReviewScraper.proxy_generator = _dummy_proxy_generator
-_random_choice_orig = random.choice
-random.choice = lambda seq: seq[0]          # pick first element even if it's None
+# also patch random.choice just while the scraper is constructed
+_orig_choice = random.choice
+random.choice = lambda seq: seq[0]          # pick first element (None)
 # ────────────────────────────────────────────────────────────────────────────
 
 PRODUCTS = [
@@ -25,23 +25,29 @@ PRODUCTS = [
     {"asin": "B071F2VLQT", "domain": "amazon.ca"},
 ]
 
-OUT = Path("outputs"); OUT.mkdir(exist_ok=True)
-today = date.today().isoformat()
+OUT = Path("outputs")
+OUT.mkdir(exist_ok=True)
+stamp = date.today().isoformat()
 
-def run_one(asin: str, domain: str):
-    os.environ["AMAZON_DOMAIN"] = domain            # Oxylabs URL builder reads this
-    # Force Chrome flags that work in CI
-    Options().add_argument("--no-sandbox")
-    Options().add_argument("--disable-dev-shm-usage")
-    scraper = ox.AmazonReviewScraper()
-    df = scraper.scrape_amazon_reviews(asin)        # returns pandas DF
-    src = Path("amazon_reviews.csv")                # library always names file like this
-    dst = OUT / f"{domain.replace('.', '_')}_{asin}_{today}.csv"
-    shutil.move(src, dst)
-    print(f"✓  {dst.name}  ({len(df)} rows)")
+def chrome_opts() -> Options:
+    o = Options()
+    o.add_argument("--headless=new")        # CI-friendly headless mode
+    o.add_argument("--no-sandbox")          # required on GH runners :contentReference[oaicite:2]{index=2}
+    o.add_argument("--disable-dev-shm-usage")
+    return o
 
 for prod in PRODUCTS:
-    run_one(prod["asin"], prod["domain"])
+    os.environ["AMAZON_DOMAIN"] = prod["domain"]   # library uses this env var
+    scraper = AmazonReviewScraper()
+    # patch the driver build so it uses Selenium-Manager automatically
+    scraper._init_chrome_driver = lambda: sel.Chrome(options=chrome_opts())
+    df = scraper.scrape_amazon_reviews(prod["asin"])   # returns pandas DF
 
-# restore random.choice just in case
-random.choice = _random_choice_orig
+    src = Path("amazon_reviews.csv")                   # library output file
+    dst = OUT / f"{prod['domain'].replace('.', '_')}_{prod['asin']}_{stamp}.csv"
+    shutil.move(src, dst)
+    print(f"✓  {dst.name}  ({len(df)} rows)")
+    time.sleep(1)
+
+# restore random.choice (defensive)
+random.choice = _orig_choice
