@@ -1,3 +1,11 @@
+-from selenium.webdriver.chrome.service import Service
+-from selenium.webdriver.common.by import By
++# ――― Selenium bits ―――――――――――――――――――――――――――――――――
++from selenium.webdriver.chrome.service import Service
++from selenium.webdriver.common.by import By
++from selenium.webdriver.remote.webelement import WebElement   # ← ADD THIS
+
+
 """
 Run the Oxylabs Selenium scraper for a fixed list of ASIN/domain pairs
 and save each run as a dated CSV in ./outputs/.
