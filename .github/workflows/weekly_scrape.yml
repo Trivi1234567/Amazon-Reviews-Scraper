@@ -1,38 +1,33 @@
-name: Weekly Amazon Reviews          # Visible in the Actions tab
+name: Weekly Amazon Reviews
 
 on:
-  schedule:                          # 04:00 UTC every Monday
-    - cron: "0 4 * * 1"
-  workflow_dispatch:                 # <-- this creates the Run button
+  schedule:
+    - cron: "0 4 * * 1"          # 04:00 UTC every Monday
+  workflow_dispatch:             # gives you the ★ Run workflow button
 
 jobs:
   scrape:
-    runs-on: ubuntu-latest           # Free & unlimited on public repos
+    runs-on: ubuntu-latest       # free & unlimited on public repos :contentReference[oaicite:6]{index=6}
     timeout-minutes: 20
 
     steps:
-      # 1  Check out the repo
-      - uses: actions/checkout@v4
-
-      # 2  Install Python 3.11
+      - uses: actions/checkout@v4            # pulls the repo
+                                            # headless Chrome already pre-installed
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # 3  Install dependencies
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4  Run the scraper
       - name: Run scraper
         run: python scrape_reviews.py
 
-      # 5  Upload the CSVs produced in ./outputs/
       - name: Upload CSVs
         uses: actions/upload-artifact@v4
         with:
           name: amazon-review-data
           path: outputs/*.csv
-          retention-days: 90        # default artefact retention period
+          retention-days: 90
